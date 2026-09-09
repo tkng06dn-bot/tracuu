@@ -5,6 +5,16 @@ from thefuzz import fuzz
 # Cài đặt giao diện trang web
 st.set_page_config(page_title="Tra Cứu Câu Hỏi", page_icon="🔍", layout="centered")
 
+# --- ĐOẠN CODE DÙNG CSS ĐỂ LÀM ĐẸP GIAO DIỆN TRÊN ĐIỆN THOẠI ---
+st.markdown("""
+<style>
+    /* Ẩn dòng chữ "Press Enter to apply" bên trong ô tìm kiếm */
+    div[data-testid="InputInstructions"] {
+        display: none !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📚 Phần Mềm Tìm Kiếm Câu Hỏi")
 st.write("Gõ một đoạn câu hỏi vào ô bên dưới, hệ thống sẽ tự động tìm kiếm!")
 
@@ -25,17 +35,31 @@ df = load_data()
 if df is not None:
     st.success(f"✅ Đã tải thành công {len(df)} câu hỏi!")
     
-    # Tạo một ô tìm kiếm hiện đại (có sẵn icon kính lúp và dấu X để xóa nhanh)
-    # Lưu ý: st.text_input mặc định không có dấu X trên mọi trình duyệt, 
-    # nhưng khi dùng trên trình duyệt điện thoại (Chrome/Safari), nó sẽ tự động thêm dấu X.
-    query = st.text_input("🔍 Nhập từ khóa tại đây:", placeholder="Gõ để tìm kiếm...")
+    # Khởi tạo bộ nhớ tạm để quản lý việc xóa chữ
+    if "search_query" not in st.session_state:
+        st.session_state.search_query = ""
+        
+    def clear_text():
+        st.session_state.search_query = ""
+
+    # Chia bố cục: Ô chữ (chiếm 7 phần), nút Tìm (1.5 phần), nút Xóa (1.5 phần)
+    col1, col2, col3 = st.columns([7, 1.5, 1.5])
     
-    # Chỉ tiến hành quét dữ liệu khi ô tìm kiếm có chữ
+    with col1:
+        query = st.text_input("Nhập từ khóa tại đây:", key="search_query")
+        
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True) # Đẩy nút xuống cho bằng với ô chữ
+        search_btn = st.button("🔍", use_container_width=True)
+        
+    with col3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        clear_btn = st.button("❌", on_click=clear_text, use_container_width=True)
+    
     if query:
         results = []
         for index, row in df.iterrows():
             question = str(row['Nội dung câu hỏi'])
-            # Vẫn tính toán độ tương đồng ngầm bên dưới để sắp xếp
             score = fuzz.token_set_ratio(query.lower(), question.lower())
             
             if score >= 60 or query.lower() in question.lower():
@@ -46,16 +70,14 @@ if df is not None:
                     'answer': str(row['Đáp án đúng'])
                 })
         
-        # Sắp xếp kết quả từ giống nhất đến ít giống nhất
         results = sorted(results, key=lambda x: x['score'], reverse=True)[:10]
         
         if not results:
             st.warning("⚠️ Không tìm thấy câu hỏi nào tương tự.")
         else:
             for i, res in enumerate(results, 1):
-                # ĐÃ XÓA PHẦN HIỂN THỊ "(Khớp ...%)" TẠI ĐÂY
+                # Hiển thị kết quả tối giản, không còn chữ "(Khớp ...%)"
                 st.markdown(f"### KẾT QUẢ {i}") 
-                
                 st.markdown(f"**❓ Câu hỏi:** {res['question']}")
                 st.markdown(f"**📋 Phương án:**\n{res['options']}")
                 st.markdown(f"**✅ ĐÁP ÁN ĐÚNG:** <span style='color:red; font-size:18px; font-weight:bold;'>{res['answer']}</span>", unsafe_allow_html=True)
