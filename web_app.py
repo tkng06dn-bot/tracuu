@@ -25,17 +25,36 @@ df = load_data()
 if df is not None:
     st.success(f"✅ Đã tải thành công {len(df)} câu hỏi!")
     
-    # Tạo một ô tìm kiếm hiện đại (có sẵn icon kính lúp và dấu X để xóa nhanh)
-    # Lưu ý: st.text_input mặc định không có dấu X trên mọi trình duyệt, 
-    # nhưng khi dùng trên trình duyệt điện thoại (Chrome/Safari), nó sẽ tự động thêm dấu X.
-    query = st.text_input("🔍 Nhập từ khóa tại đây:", placeholder="Gõ để tìm kiếm...")
+    # 1. Khởi tạo bộ nhớ tạm để quản lý nội dung ô tìm kiếm
+    if "search_query" not in st.session_state:
+        st.session_state.search_query = ""
+        
+    # 2. Hàm thực thi khi bấm nút Xóa (làm trống nội dung)
+    def clear_text():
+        st.session_state.search_query = ""
+
+    # 3. Thiết kế bố cục 3 cột nằm ngang
+    col1, col2, col3 = st.columns([6, 2, 2])
+    
+    with col1:
+        # Ô nhập liệu chiếm 6 phần, liên kết với bộ nhớ 'search_query'
+        query = st.text_input("🔍 Nhập từ khóa tại đây:", key="search_query")
+        
+    with col2:
+        # Nút tìm kiếm chiếm 2 phần
+        st.markdown("<br>", unsafe_allow_html=True) # Căn chỉnh cho bằng với ô chữ
+        search_btn = st.button("🔍 Tìm", use_container_width=True)
+        
+    with col3:
+        # Nút xóa chiếm 2 phần
+        st.markdown("<br>", unsafe_allow_html=True)
+        clear_btn = st.button("❌ Xóa", on_click=clear_text, use_container_width=True)
     
     # Chỉ tiến hành quét dữ liệu khi ô tìm kiếm có chữ
     if query:
         results = []
         for index, row in df.iterrows():
             question = str(row['Nội dung câu hỏi'])
-            # Vẫn tính toán độ tương đồng ngầm bên dưới để sắp xếp
             score = fuzz.token_set_ratio(query.lower(), question.lower())
             
             if score >= 60 or query.lower() in question.lower():
@@ -46,16 +65,13 @@ if df is not None:
                     'answer': str(row['Đáp án đúng'])
                 })
         
-        # Sắp xếp kết quả từ giống nhất đến ít giống nhất
         results = sorted(results, key=lambda x: x['score'], reverse=True)[:10]
         
         if not results:
             st.warning("⚠️ Không tìm thấy câu hỏi nào tương tự.")
         else:
             for i, res in enumerate(results, 1):
-                # ĐÃ XÓA PHẦN HIỂN THỊ "(Khớp ...%)" TẠI ĐÂY
-                st.markdown(f"### KẾT QUẢ {i}") 
-                
+                st.markdown(f"### KẾT QUẢ {i} (Khớp {res['score']}%)")
                 st.markdown(f"**❓ Câu hỏi:** {res['question']}")
                 st.markdown(f"**📋 Phương án:**\n{res['options']}")
                 st.markdown(f"**✅ ĐÁP ÁN ĐÚNG:** <span style='color:red; font-size:18px; font-weight:bold;'>{res['answer']}</span>", unsafe_allow_html=True)
